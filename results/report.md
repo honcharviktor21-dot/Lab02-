@@ -3,65 +3,82 @@
 **Student ID:** 72014  
 **Institution:** Vistula University | Data Science Program
 
-## 1. Architectural Overview and Initialization
-This laboratory exercise implements a standard Multilayer Perceptron (MLP) explicitly designed for classifying the 64-dimensional arrays of the `load_digits` dataset into 10 distinct digit classes. The architecture utilizes two hidden layers, configured with a dynamic width parameter ($W$), utilizing Rectified Linear Unit (ReLU) activations, and concluding with a Softmax output layer.
+---
 
-The weight matrices are initialized using a normal distribution of $\mathcal{N}(0, 0.01)$, while bias vectors are initialized to zero. This ensures the initial outputs are roughly uniform, preventing vanishing gradients at the very first forward pass.
+## 1. Architectural Overview and Parameter Initialization
+This laboratory exercise involves engineering a Multilayer Perceptron (MLP) from scratch using purely native `numpy` matrix operations. The objective is to correctly classify the `load_digits` dataset, which consists of $8\times8$ pixel images (flattened to 64-dimensional input arrays) into 10 distinct numerical classes (digits 0 through 9). 
 
-**Matrix Dimensionality for $W=64$:**
-| Layer / Parameter | Shape Specification | Activation Function |
-| :--- | :--- | :--- |
-| **Input ($X$)** | `(Batch_Size, 64)` | None |
-| **Hidden 1 ($W_1, b_1$)** | `(64, W)`, `(W,)` | ReLU: $f(x) = \max(0, x)$ |
-| **Hidden 2 ($W_2, b_2$)** | `(W, W)`, `(W,)` | ReLU: $f(x) = \max(0, x)$ |
-| **Output ($W_3, b_3$)** | `(W, 10)`, `(10,)` | Softmax |
+To achieve this, the architecture is designed with two hidden layers featuring a dynamic width parameter ($W$), Rectified Linear Unit (ReLU) non-linearities, and a concluding Softmax activation for probabilistic classification.
+
+### 1.1 Dimensionality and Transformation Matrix
+The network's structural transformations for the high-capacity model ($W=64$) are detailed below. The weights are purposefully initialized from a normal distribution $\mathcal{N}(0, 0.01)$ to break symmetry, while biases are initialized to zero. Scaling the variance by $0.01$ ensures that initial outputs remain small, preventing the Softmax function from saturating and causing vanishing gradients in the very first epoch.
+
+| Layer / Component | Parameter Shape | Matrix Operation | Output Shape | Activation Function |
+| :--- | :--- | :--- | :--- | :--- |
+| **Input ($X$)** | N/A | Batch of flattened arrays | `(32, 64)` | None |
+| **Hidden Layer 1** | $W_1$: `(64, W)`<br>$b_1$: `(W,)` | $Z_1 = X \cdot W_1 + b_1$ | `(32, W)` | ReLU: $f(x) = \max(0, x)$ |
+| **Hidden Layer 2** | $W_2$: `(W, W)`<br>$b_2$: `(W,)` | $Z_2 = A_1 \cdot W_2 + b_2$ | `(32, W)` | ReLU: $f(x) = \max(0, x)$ |
+| **Output Layer** | $W_3$: `(W, 10)`<br>$b_3$: `(10,)` | $Z_3 = A_2 \cdot W_3 + b_3$ | `(32, 10)` | Softmax: $\frac{e^{z_i}}{\sum e^{z_k}}$ |
+
+---
 
 ## 2. Forward Propagation and Theoretical Loss Validation
-The forward propagation phase systematically applies dot products and non-linearities. The final Softmax layer converts the raw logits into a normalized probability distribution. 
+Forward propagation pushes the data batch through the defined matrix transformations. The final step involves computing the Cross-Entropy loss to penalize the divergence between the predicted probability distribution and the true one-hot encoded labels:
 
-To validate the structural integrity of the untrained network, the initial Cross-Entropy loss is calculated via the formula:
-$$L = -\frac{1}{N} \sum_{i=1}^{N} y_i \log(\hat{y}_i)$$
+$$L = -\frac{1}{N} \sum_{i=1}^{N} \sum_{c=1}^{C} y_{i,c} \log(\hat{y}_{i,c})$$
 
+**Validation of the Untrained State:**
+Before exposing the network to optimization, a sanity check was performed on the initial forward pass. 
 *   **Observed Initial Loss:** $2.3026$
-*   **Theoretical Expectation:** For 10 classes, an untrained network should output approximately equal probabilities for each class ($P = 0.1$). The expected negative log-likelihood is $-\ln(0.1) \approx 2.30258$. 
-*   **Conclusion:** The exact match confirms the forward pass, softmax normalization, and loss function are correctly scaling inputs without mathematical overflow.
+*   **Theoretical Expectation:** An untrained network initialized with near-zero weights will output an approximately uniform distribution across all 10 classes, meaning it assigns a probability of $P = 0.1$ to each class. The theoretical negative log-likelihood is therefore $-\ln(0.1) \approx 2.30258$. 
+*   **Conclusion:** The exact parity between the observed and expected loss confirms that the forward pass, the Softmax normalization (which sums to exactly $1.0$), and the Cross-Entropy calculation are mathematically sound and free of overflow/underflow errors.
+
+---
 
 ## 3. Backpropagation and Gradient Verification
-Backpropagation was implemented utilizing the chain rule to calculate the partial derivatives of the loss with respect to each weight and bias. 
+To enable learning, backpropagation is utilized to calculate the gradient of the loss function with respect to every weight and bias via the chain rule. 
 
-Before proceeding to the training loop, analytical gradients were subjected to numerical gradient checking. By perturbing a random subset of 10 weights by $\epsilon = 1e-5$, the numerical slope was compared against the derived analytical slope. All evaluated weights yielded a relative error strictly bounded below $1e-6$, proving the backpropagation calculus is mathematically sound.
+To guarantee the calculus was implemented correctly without human error, the analytical gradients were cross-examined using **Numerical Gradient Checking**. This method approximates the derivative using the central difference formula:
+$$\frac{\partial L}{\partial w} \approx \frac{L(w + \epsilon) - L(w - \epsilon)}{2\epsilon}$$
 
-## 4. Hyperparameter Evaluation and Network Convergence
-The network was trained over 50 epochs utilizing Stochastic Gradient Descent (SGD) with a mini-batch size of 32. Two structural widths ($W \in \{16, 64\}$) and three learning rates ($\alpha \in \{0.001, 0.01, 0.1\}$) were tested.
+By perturbing a random subset of 10 weights by a microscopic margin ($\epsilon = 1e-5$), the program compared the numerically derived slopes against the analytically derived slopes. Every tested parameter yielded a relative error strictly bounded below the required $1e-6$ threshold, verifying that the backpropagation logic is flawless.
 
-### Empirical Training Results
-| Hidden Width ($W$) | Learning Rate ($\alpha$) | Final Test Accuracy | Convergence Behavior |
+---
+
+## 4. Hyperparameter Evaluation and Training Dynamics
+The network was optimized over 50 epochs utilizing Stochastic Gradient Descent (SGD) with a mini-batch size of 32. The experiment tested permutations of two structural widths ($W \in \{16, 64\}$) and three distinct learning rates ($\alpha \in \{0.001, 0.01, 0.1\}$).
+
+### 4.1 Empirical Training Results
+| Capacity ($W$) | Learning Rate ($\alpha$) | Final Test Accuracy | Convergence Assessment |
 | :---: | :---: | :---: | :--- |
-| 16 | 0.001 | **10.19%** | Severe Underfitting (Stagnant)[cite: 3] |
-| 16 | 0.01 | **10.19%** | Severe Underfitting (Stagnant)[cite: 3] |
-| 16 | 0.1 | **51.48%** | Partial Convergence; capacity too low. |
-| 64 | 0.001 | **10.19%** | Severe Underfitting (Stagnant)[cite: 3] |
-| 64 | 0.01 | **10.19%** | Severe Underfitting (Stagnant)[cite: 3] |
-| **64** | **0.1** | **86.85%** | **Optimal Convergence**; highest capacity. |
+| 16 | 0.001 | **10.19%** | **Stagnant:** Step size too small to traverse the loss landscape[cite: 3]. |
+| 16 | 0.01 | **10.19%** | **Stagnant:** Failed to break initial loss plateau[cite: 3]. |
+| 16 | 0.1 | **51.48%** | **Partial Convergence:** Network bottlenecked by low dimensionality. |
+| 64 | 0.001 | **10.19%** | **Stagnant:** Wide architecture unable to compensate for slow $\alpha$[cite: 3]. |
+| 64 | 0.01 | **10.19%** | **Stagnant:** Wide architecture unable to compensate for slow $\alpha$[cite: 3]. |
+| **64** | **0.1** | **86.85%** | **Optimal Convergence:** Sufficient capacity and step size to learn. |
 
-### Analysis of Training Dynamics
-1.  **The "10.19%" Threshold:** A consistent accuracy of 10.19% indicates that the network is essentially guessing blindly. Since there are 10 digit classes, random chance yields a $\sim10\%$ success rate. As visualized in the loss curves[cite: 3], learning rates of 0.001 and 0.01 lack the magnitude required to shift the weights away from their random initializations within just 50 epochs.
-2.  **Impact of Network Width:** At the functional learning rate of $\alpha = 0.1$, the wider network ($W=64$) vastly outperforms the narrow network ($W=16$). The $W=64$ architecture possesses significantly more learnable parameters, allowing it to capture the complex spatial pixel relationships of the digit matrices, climbing from a 51.48% accuracy up to 86.85%.
+### 4.2 Analysis of Learning Behaviors
+1.  **The "10.19%" Random Guessing Phenomenon:** Across all tests utilizing learning rates of 0.001 and 0.01, the network yielded an accuracy of exactly 10.19%. Because the dataset contains 10 target classes, a completely blind guess yields an expected accuracy of $\sim10\%$. As visualized in the generated training loss curves, the loss trajectories for these configurations remain entirely flat[cite: 3]. This indicates that the gradient updates were too miniscule to pull the model out of its initial saddle point within the strict 50-epoch limit.
+2.  **Capacity vs. Representation:** When utilizing the functional learning rate of $\alpha = 0.1$, a clear distinction emerges between the $W=16$ and $W=64$ models. The wider network ($W=64$) possesses exponentially more trainable parameters, giving it the necessary "memory" and representative capacity to map the complex, non-linear spatial relationships of the $8\times8$ pixel grids. This resulted in an aggressive minimization of loss[cite: 3] and a commanding accuracy of 86.85%, compared to the bottlenecked 51.48% of the narrower architecture.
+
+---
 
 ## 5. Computational Complexity and Execution Timing
-To understand the hardware performance characteristics, both forward and backward propagation passes were timed in isolation over a median of 100 benchmark iterations.
+To understand the hardware performance characteristics, both the forward and backward propagation passes were benchmarked in isolation. The script recorded a median execution time across 100 runs for the $W=64$ architecture.
 
-### Microsecond Benchmark Metrics
-| Operation | Median Execution Time | Relative Cost |
+### 5.1 Microsecond Benchmark Metrics
+| Operation Phase | Median Execution Time | Relative Computational Cost |
 | :--- | :--- | :--- |
-| **Forward Pass** | $0.0403 \text{ ms}$ | $1.0\times$ (Baseline)[cite: 4] |
+| **Forward Pass** | $0.0403 \text{ ms}$ | $1.00\times$ (Baseline)[cite: 4] |
 | **Backward Pass** | $0.0597 \text{ ms}$ | $1.48\times$ (Slower)[cite: 4] |
 
-### Matrix Operation Analysis
-The backward pass exhibits a ~48% computational penalty compared to the forward pass[cite: 4]. During forward propagation, the algorithm only executes standard matrix multiplications: $Z^{[l]} = A^{[l-1]} \cdot W^{[l]}$.
+### 5.2 Matrix Operation Analysis
+The empirical data demonstrates that the backward pass incurs a massive ~48% computational penalty compared to the forward pass[cite: 4]. This behavior is a fundamental mathematical reality of training neural networks:
 
-However, backpropagation requires calculating two distinct sets of gradients per layer:
-1.  **Gradients of the weights:** $dW^{[l]} = (A^{[l-1]})^T \cdot dZ^{[l]}$
-2.  **Gradients of the upstream activations:** $dA^{[l-1]} = dZ^{[l]} \cdot (W^{[l]})^T$
+*   **Forward Propagation** is relatively lightweight. It requires only standard, sequential matrix multiplications to push activations forward: $Z^{[l]} = A^{[l-1]} \cdot W^{[l]}$.
+*   **Backward Propagation** is heavily demanding. To distribute the error backwards, the CPU must compute two distinct gradients per layer:
+    1.  **Weight Gradients:** $dW^{[l]} = (A^{[l-1]})^T \cdot dZ^{[l]}$ (requires transposing the previous activation matrix).
+    2.  **Activation Gradients:** $dA^{[l-1]} = dZ^{[l]} \cdot (W^{[l]})^T$ (requires transposing the current weight matrix).
 
-The necessity to constantly compute matrix transposes (e.g., $(A)^T$ and $(W)^T$) and process double the amount of dot products per layer inherently makes the backward pass the dominant factor in the algorithm's time complexity[cite: 4].
+The continuous necessity to perform hardware-level memory transpositions (swapping rows and columns) combined with executing double the amount of dot products inherently causes the backward pass to dominate the overall time complexity of the algorithm[cite: 4].
